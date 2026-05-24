@@ -517,7 +517,9 @@ function renderPedidos(){
 
 function buildOrderCard(p){
   let itens=[];try{itens=JSON.parse(p.itens||'[]');}catch(e){}
-  const total=itens.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
+  const totalItens=itens.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
+  const total=p.total||totalItens; // usa total salvo (já com cashback aplicado)
+  const cashbackAplicado=totalItens>total?(totalItens-total-(membroCoroa?0:1.99)):0;
   const urgente=isUrgente(p.criado_em);
   const tempo=tempoDecorrido(p.criado_em);
   const pagto=p.forma_pagamento||'';
@@ -556,6 +558,8 @@ function buildOrderCard(p){
     </div>
     <div class="card-body">
       ${itens.map(i=>`<div class="card-item"><span class="card-item-qty">${i.qty||1}×</span><span style="flex:1">${i.nome||i.id}${i.sub?' ('+i.sub+')':''}</span><span class="card-item-preco">R$ ${((i.preco||0)*(i.qty||1)).toFixed(2).replace('.',',')}</span></div>`).join('')}
+      ${cashbackAplicado>0?`<div class="card-info-row" style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15)"><span style="color:#4ade80;font-size:.65rem;font-weight:900">💰 Cashback −R$ ${cashbackAplicado.toFixed(2).replace('.',',')} aplicado</span></div>`:''}
+      ${p.troco&&p.troco!=='Sem troco'?`<div class="card-info-row" style="background:rgba(242,193,46,.05);border:1px solid rgba(242,193,46,.12)">💵 ${p.troco}</div>`:''}
       ${pagto?`<div class="card-info-row pagto">${PI[pagto]||'💳'} ${pagto} — pagar na entrega</div>`:''}
       ${p.cliente_end?`<div class="card-info-row end"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="#F2C12E" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke="#F2C12E" stroke-width="2"/></svg>${p.cliente_end}</div>`:''}
     </div>
