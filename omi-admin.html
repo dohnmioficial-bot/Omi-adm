@@ -512,11 +512,22 @@ function renderPedidos(){
     return;
   }
   el.innerHTML='';
-  lista.forEach(p=>el.appendChild(buildOrderCard(p)));
+  lista.forEach(p=>{
+    try{
+      el.appendChild(buildOrderCard(p));
+    }catch(err){
+      console.error('Erro no card:',err,p);
+      const div=document.createElement('div');
+      div.className='order-card novo';
+      div.style.cssText='padding:14px;color:var(--text)';
+      div.innerHTML=`<div style="font-weight:900">${p.cliente_nome||'Pedido'}</div><div style="font-size:.75rem;opacity:.6;margin-top:4px">Erro ao exibir card: ${err.message}</div>`;
+      el.appendChild(div);
+    }
+  });
 }
 
 function buildOrderCard(p){
-  let itens=[];try{itens=JSON.parse(p.itens||'[]');}catch(e){}
+  let itens=[];try{const raw=p.itens;itens=Array.isArray(raw)?raw:(typeof raw==='string'?JSON.parse(raw):(raw?Object.values(raw):[]));}catch(e){itens=[];}
   const totalItens=itens.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
   const total=p.total||totalItens; // usa total salvo (já com cashback aplicado)
   const taxaEntrega=1.99;
