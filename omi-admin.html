@@ -617,12 +617,29 @@ async function marcarEntregue(id,whats,nome,total){
     }
     const novoTotal=(cli.total_pedidos||0)+1;
     const selosAtual=JSON.parse(cli.selos||'{}');
-    selosAtual[novoTotal]='entregue';
+    selosAtual[novoTotal]='pedido'+novoTotal;
     const selosCount=Object.keys(selosAtual).length;
-    const novoCromi=(cli.cromi_acumulado||0)+total*CROMI_PCT;
-    const premHamb=selosCount>=7&&!cli.premio_hamburguer;
-    const premCombo=novoTotal>=12&&!cli.membro_coroa;
-    const membroCoroa=novoTotal>=12;
+    const membroCoroa=novoTotal>=12||cli.membro_coroa;
+
+    // CROMI — regras exatas da Jornada e Membro
+    const pedidosComCromi=[1,2,3,4,8,9,10];
+    let novoCromi=cli.cromi_acumulado||0;
+    let cashbackAplicado=0;
+    let msgCashback='';
+
+    if(membroCoroa){
+      // Membro da Coroa: R$1,70 por pedido válido, máx R$11,90
+      novoCromi=Math.min(11.90, novoCromi+1.70);
+      if(novoCromi>=11.90){cashbackAplicado=11.90;novoCromi=0;msgCashback='\n💰 Cashback R$11,90 desbloqueado!';}
+    } else if(pedidosComCromi.includes(novoTotal)){
+      novoCromi+=1.49;
+      if(novoTotal===4&&novoCromi>=5.96){cashbackAplicado=5.96;novoCromi=0;msgCashback='\n💰 Cashback R$5,96 liberado!';}
+      else if(novoTotal===10&&novoCromi>=4.47){cashbackAplicado=4.47;novoCromi=0;msgCashback='\n💰 Cashback R$4,47 liberado!';}
+    }
+
+    const premHamb=novoTotal===7&&!cli.premio_hamburguer;
+    const premCombo=novoTotal===12&&!cli.premio_combo;
+
     await fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(whats)}`,{
       method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
       body:JSON.stringify({total_pedidos:novoTotal,selos:JSON.stringify(selosAtual),
@@ -631,13 +648,23 @@ async function marcarEntregue(id,whats,nome,total){
         premio_combo:premCombo||(cli.premio_combo||false),
         ultimo_pedido:new Date().toISOString()})
     });
+
     const nome1=(nome||'').split(' ')[0]||'cidadão';
-    let msg=`✅ Entregue! Obrigado, ${nome1}.\n\n📊 Jornada:\n• Selos: ${selosCount}/7\n• CROMI: R$ ${novoCromi.toFixed(2).replace('.',',')}`;
-    if(premHamb)msg+='\n\n🎁 Hambúrguer grátis desbloqueado!';
-    if(premCombo)msg+='\n\n👑 Você é Membro da Coroa!';
-    else if(selosCount<7)msg+=`\nFalta${7-selosCount>1?'m':''} ${7-selosCount} selo${7-selosCount>1?'s':''} para o prêmio!`;
+    const faltaProx=membroCoroa?Math.ceil((11.90-novoCromi)/1.70):
+      novoTotal<7?(7-novoTotal):novoTotal<12?(12-novoTotal):0;
+    const proximoMarco=membroCoroa?`Faltam ${Math.ceil((11.90-novoCromi)/1.70)} pedidos para cashback`:
+      novoTotal<7?`Faltam ${7-novoTotal} pedidos para hambúrguer grátis`:
+      novoTotal<12?`Faltam ${12-novoTotal} pedidos para Membro da Coroa`:'';
+
+    let msg=`✅ Pedido ${novoTotal} confirmado! Obrigado, ${nome1}.\n\n📊 Jornada:\n• Pedido: ${novoTotal}/12\n• CROMI: R$ ${novoCromi.toFixed(2).replace('.',',')}`;
+    msg+=msgCashback;
+    if(premHamb)msg+='\n\n🎁 Hambúrguer grátis desbloqueado! Use no próximo pedido.';
+    if(premCombo)msg+='\n\n👑 Parabéns! Você é Membro da Coroa! Entrega grátis a partir de agora.';
+    if(proximoMarco)msg+=`\n\n${proximoMarco}`;
     if(p?.conversa_id)await enviarMsgSistema(p.conversa_id,msg);
-    showToast(`✓ +1 selo · +R$ ${(total*CROMI_PCT).toFixed(2)} CROMI`);
+    const toastMsg=premHamb?'✓ 🎁 Hambúrguer grátis!':premCombo?'✓ 👑 Membro da Coroa!':
+      cashbackAplicado>0?`✓ Cashback R$${cashbackAplicado.toFixed(2)} liberado!`:`✓ Selo ${novoTotal}/12 · CROMI atualizado`;
+    showToast(toastMsg);
     renderPedidos();
     // Reload clientes para relatório
     await carregarClientes();
