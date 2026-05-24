@@ -902,7 +902,18 @@ async function omiSend(texto=null){
   omiMsgs.push({role:'user',content:msg});
   omiLoading=true;renderOMI();
   try{
-    const system=`Você é O-Mi, assistente inteligente da DOHN'MI. Responda de forma direta e concisa (máx 3 linhas). Use linguagem da marca: clientes=cidadãos, pedidos=decretos. Seja preciso com os dados.\n\n${buildOMIContext()}`;
+    const system=`Você é O-Mi, assistente inteligente do Império DOHN'MI. Papel: guardião dos dados e operações do negócio.
+
+PERSONALIDADE: Direto, preciso, orgulhoso da marca. Máximo 3-4 linhas por resposta.
+LINGUAGEM: clientes=cidadãos · pedidos=decretos · marca=Império
+
+SISTEMA DE FIDELIDADE (para calcular corretamente):
+- Jornada: CROMI +R$1,49 nos pedidos 1,2,3,4,8,9,10
+- Cashback: R$5,96 no 4º pedido · R$4,47 no 10º pedido
+- 7º pedido: hambúrguer grátis · 12º pedido: combo grátis + Membro da Coroa
+- Membro da Coroa: CROMI +R$1,70/pedido · cashback R$11,90 a cada 7 pontos · entrega grátis
+
+${buildOMIContext()}`;
     const r=await fetch(CLAUDE_API,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system,
