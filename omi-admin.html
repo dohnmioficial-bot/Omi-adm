@@ -418,7 +418,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;
 const SUPA_URL = 'https://ppnrmrnkpmzpufppdzwf.supabase.co';
 const SUPA_KEY = 'sb_publishable_ZxPkeXTseIayHdi40I5AXQ_vpOcHgRb';
 const H = {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'};
-const CROMI_PCT = 0.05;
+// CROMI: R$1,49 por pedido (jornada) · R$1,70 por pedido (membro)
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 
 // ── STATE ──
@@ -529,7 +529,7 @@ function renderPedidos(){
 function buildOrderCard(p){
   let itens=[];try{const raw=p.itens;itens=Array.isArray(raw)?raw:(typeof raw==='string'?JSON.parse(raw):(raw?Object.values(raw):[]));}catch(e){itens=[];}
   const totalItens=itens.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
-  const total=p.total||totalItens; // usa total salvo (já com cashback aplicado)
+  const total=parseFloat(p.total)||totalItens; // usa total salvo (já com cashback aplicado)
   const taxaEntrega=1.99;
   const cashbackAplicado=totalItens>total?(totalItens-total-taxaEntrega):0;
   const urgente=isUrgente(p.criado_em);
@@ -670,8 +670,10 @@ async function marcarEntregue(id,whats,nome,total){
       else if(novoTotal===10&&novoCromi>=4.47){cashbackAplicado=4.47;novoCromi=0;msgCashback='\n💰 Cashback R$4,47 liberado!';}
     }
 
-    const premHamb=novoTotal===7&&!cli.premio_hamburguer;
-    const premCombo=novoTotal===12&&!cli.premio_combo;
+    // Prêmio ativado APÓS 6ª entrega → 7º pedido usa
+    // Prêmio combo ativado APÓS 11ª entrega → 12º pedido usa
+    const premHamb=novoTotal===6&&!cli.premio_hamburguer;
+    const premCombo=novoTotal===11&&!cli.premio_combo;
 
     await fetch(`${SUPA_URL}/rest/v1/clientes?whatsapp=eq.${encodeURIComponent(whats)}`,{
       method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
@@ -696,7 +698,7 @@ async function marcarEntregue(id,whats,nome,total){
     if(proximoMarco)msg+=`\n\n${proximoMarco}`;
     if(p?.conversa_id)await enviarMsgSistema(p.conversa_id,msg);
     const toastMsg=premHamb?'✓ 🎁 Hambúrguer grátis!':premCombo?'✓ 👑 Membro da Coroa!':
-      cashbackAplicado>0?`✓ Cashback R$${cashbackAplicado.toFixed(2)} liberado!`:`✓ Selo ${novoTotal}/12 · CROMI atualizado`;
+      premHamb?`🍔 Hambúrguer grátis desbloqueado para o ${novoTotal+1}º pedido!`:premCombo?`🎁 Combo grátis desbloqueado para o ${novoTotal+1}º pedido!`:cashbackAplicado>0?`✓ Cashback R$${cashbackAplicado.toFixed(2)} liberado!`:`✓ Selo ${novoTotal}/12 · CROMI atualizado`;
     showToast(toastMsg);
     renderPedidos();
     // Reload clientes para relatório
