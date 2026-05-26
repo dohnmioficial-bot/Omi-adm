@@ -641,23 +641,35 @@ async function marcarEntregue(id,whats,nome,total){
       cli=lista[0];
     }
     const novoTotal=(cli.total_pedidos||0)+1;
-    const selosAtual=JSON.parse(cli.selos||'{}');
+    // selos: trata string ou objeto (jsonb do Supabase)
+    let selosAtual={};
+    try{
+      const rawS=cli.selos;
+      selosAtual=typeof rawS==='string'?JSON.parse(rawS||'{}'):(rawS||{});
+    }catch(e){selosAtual={};}
+
     // Determina tipo do selo pelo item principal do pedido
     let tipoSelo='real';
     try{
-      // Supabase retorna jsonb como objeto ou string — trata os dois casos
       const raw=p.itens;
-      const itArr=Array.isArray(raw)?raw:(typeof raw==='string'?JSON.parse(raw):JSON.parse(JSON.stringify(raw||'[]')));
+      const itArr=Array.isArray(raw)?raw:(typeof raw==='string'?JSON.parse(raw):(raw?Object.values(raw):[{}]));
+      // Hambúrgueres e combos atuais
       const hamburguers=['real','nobre','imperador','supremo','paraiso','alteza'];
-      const combos=['favorito','crocante','familia'];
-      const allIds=hamburguers.concat(combos,['batata150','batata300','croc6','croc12']);
-      const principal=itArr.find(i=>allIds.includes((i.id||'').toLowerCase()));
+      const combos=['soberano','monarca','imperio','dame','favorito','crocante','familia'];
+      // Prioridade: hambúrguer > combo > crocantíssimos > batata
+      const principal=
+        itArr.find(i=>hamburguers.includes((i.id||'').toLowerCase())) ||
+        itArr.find(i=>combos.includes((i.id||'').toLowerCase())) ||
+        itArr[0];
       if(principal){
         const id=(principal.id||'real').toLowerCase();
-        tipoSelo=hamburguers.includes(id)?id:combos.includes(id)?'combo':id;
+        if(hamburguers.includes(id)) tipoSelo=id;
+        else if(combos.includes(id)) tipoSelo='combo';
+        else if(id.startsWith('croc')) tipoSelo='crocantissimo';
+        else tipoSelo='real';
       }
     }catch(e){console.warn('selo parse error',e);}
-    // Pedido 4 e 10 = cashcromi
+    // Pedido 4 e 10 = cashcromi (sobrescreve)
     if(novoTotal===4||novoTotal===10) tipoSelo='cashcromi';
     selosAtual[novoTotal]=tipoSelo;
     const selosCount=Object.keys(selosAtual).length;
